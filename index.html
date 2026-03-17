@@ -4,31 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Schmerztagebuch App</title>
+<title>Schmerztagebuch Pro+</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
 
-body{
-font-family:-apple-system;
-margin:0;
-background:#f2f2f7;
-}
-
-.screen{
-display:none;
-padding:15px;
-}
-
-.active{
-display:block;
-}
+body{font-family:-apple-system;margin:0;background:#f2f2f7;}
+.screen{display:none;padding:15px;padding-bottom:80px;}
+.active{display:block;}
 
 .card{
 background:white;
 padding:15px;
-border-radius:12px;
+border-radius:16px;
 margin-bottom:15px;
 }
 
@@ -56,25 +46,12 @@ bottom:0;
 width:100%;
 display:flex;
 background:white;
-border-top:1px solid #ccc;
 }
 
 .nav button{
 flex:1;
 background:none;
 color:#007AFF;
-padding:10px;
-}
-
-.selected{
-background:#007AFF;
-color:white;
-}
-
-.bodymap button{
-margin:5px;
-background:#eee;
-color:black;
 }
 
 </style>
@@ -82,122 +59,127 @@ color:black;
 
 <body>
 
-<!-- SCREEN 1: EINTRAG -->
-<div id="entry" class="screen active">
-
-<h2>Neuer Eintrag</h2>
+<!-- LOGIN -->
+<div id="login" class="screen active">
+<h2>Login</h2>
 
 <div class="card">
-
-<input type="number" id="pain" placeholder="Schmerz 0-10">
-<input type="range" id="stress" min="0" max="10">
-<input type="text" id="med" placeholder="Medikament">
-
-<div class="bodymap">
-<button onclick="selectLoc(this,'Kopf')">Kopf</button>
-<button onclick="selectLoc(this,'Rücken')">Rücken</button>
-<button onclick="selectLoc(this,'Bauch')">Bauch</button>
-<button onclick="selectLoc(this,'Bein')">Bein</button>
+<input id="user" placeholder="Name">
+<button onclick="login()">Start</button>
+</div>
 </div>
 
-<textarea id="notes" placeholder="Notizen"></textarea>
+<!-- APP -->
+<div id="app" class="screen">
+
+<!-- ENTRY -->
+<div id="entry">
+<div class="card">
+
+<input id="pain" type="number" placeholder="Schmerz 0-10">
+<input id="stress" type="range" min="0" max="10">
+<input id="med" placeholder="Medikament">
+
+<select id="loc">
+<option value="">Ort wählen</option>
+<option>Kopf</option>
+<option>Rücken</option>
+<option>Bauch</option>
+<option>Bein</option>
+</select>
+
+<textarea id="notes"></textarea>
 
 <button onclick="save()">Speichern</button>
 
 </div>
-
 </div>
 
-<!-- SCREEN 2: VERLAUF -->
-<div id="history" class="screen">
-
-<h2>Verlauf</h2>
-
-<div class="card">
+<!-- HISTORY -->
+<div id="history" style="display:none">
 <canvas id="chart"></canvas>
-</div>
-
 <div id="list"></div>
+</div>
+
+<!-- ANALYSIS -->
+<div id="analysis" style="display:none">
+<div id="ai"></div>
+<button onclick="exportPDF()">PDF Export</button>
+</div>
 
 </div>
 
-<!-- SCREEN 3: ANALYSE -->
-<div id="analysis" class="screen">
-
-<h2>Analyse</h2>
-
-<div class="card" id="ai"></div>
-
-</div>
-
-<!-- NAVIGATION -->
+<!-- NAV -->
 <div class="nav">
-<button onclick="show('entry')">➕</button>
-<button onclick="show('history')">📊</button>
-<button onclick="show('analysis')">🤖</button>
+<button onclick="showTab('entry')">➕</button>
+<button onclick="showTab('history')">📊</button>
+<button onclick="showTab('analysis')">🤖</button>
 </div>
 
 <script>
 
-let data = JSON.parse(localStorage.getItem("painData")) || []
-let selectedLoc=""
+let user = localStorage.getItem("user")
+let data = JSON.parse(localStorage.getItem("data")) || []
 
-function show(id){
-document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"))
-document.getElementById(id).classList.add("active")
-
-if(id==="history") render()
-if(id==="analysis") runAI()
+if(user){
+document.getElementById("login").classList.remove("active")
+document.getElementById("app").classList.add("active")
 }
 
-function selectLoc(btn,loc){
-selectedLoc=loc
-document.querySelectorAll(".bodymap button")
-.forEach(b=>b.classList.remove("selected"))
-btn.classList.add("selected")
+function login(){
+user = document.getElementById("user").value
+localStorage.setItem("user",user)
+location.reload()
+}
+
+function showTab(tab){
+document.getElementById("entry").style.display="none"
+document.getElementById("history").style.display="none"
+document.getElementById("analysis").style.display="none"
+
+document.getElementById(tab).style.display="block"
+
+if(tab==="history") render()
+if(tab==="analysis") runAI()
 }
 
 function save(){
 
+let pain = document.getElementById("pain").value
+
 let entry={
-date:new Date().toLocaleString(),
-pain:Number(document.getElementById("pain").value),
+date:new Date().toISOString(),
+pain: pain===""?null:Number(pain),
 stress:Number(document.getElementById("stress").value),
 med:document.getElementById("med").value,
-loc:selectedLoc,
+loc:document.getElementById("loc").value,
 notes:document.getElementById("notes").value
 }
 
-if(!entry.pain||!entry.loc){
-alert("Bitte Schmerz und Ort wählen")
+if(entry.pain===null||entry.loc===""){
+alert("Bitte alles ausfüllen")
 return
 }
 
 data.push(entry)
-localStorage.setItem("painData",JSON.stringify(data))
+localStorage.setItem("data",JSON.stringify(data))
 
-alert("Gespeichert ✅")
+alert("Gespeichert")
 
 }
 
 function render(){
 
-document.getElementById("list").innerHTML=""
+let list=document.getElementById("list")
+list.innerHTML=""
 
 data.forEach(e=>{
-document.getElementById("list").innerHTML+=`
+list.innerHTML+=`
 <div class="card">
-${e.date}<br>
-Schmerz:${e.pain} Stress:${e.stress}<br>
-Ort:${e.loc}
+${new Date(e.date).toLocaleDateString()}<br>
+Schmerz:${e.pain}
 </div>`
 })
-
-drawChart()
-
-}
-
-function drawChart(){
 
 let labels=data.map(e=>e.date)
 let values=data.map(e=>e.pain)
@@ -206,13 +188,7 @@ if(window.c) window.c.destroy()
 
 window.c=new Chart(document.getElementById("chart"),{
 type:"line",
-data:{
-labels:labels,
-datasets:[{
-label:"Schmerzverlauf",
-data:values
-}]
-}
+data:{labels:labels,datasets:[{data:values}]}
 })
 
 }
@@ -224,25 +200,25 @@ document.getElementById("ai").innerText="Zu wenig Daten"
 return
 }
 
-let stressImpact = data.reduce((a,b)=>a+(b.pain*b.stress),0)/data.length
+let avg=data.reduce((a,b)=>a+b.pain,0)/data.length
 
-let locations={}
-data.forEach(e=>{
-locations[e.loc]=(locations[e.loc]||0)+e.pain
-})
+document.getElementById("ai").innerText=
+"Durchschnitt Schmerz: "+avg.toFixed(1)
 
-let worstLoc = Object.keys(locations)
-.sort((a,b)=>locations[b]-locations[a])[0]
-
-let text=""
-
-if(stressImpact>40){
-text+="⚠️ Stress verstärkt Schmerzen\n"
 }
 
-text+="Häufigste Stelle: "+worstLoc
+async function exportPDF(){
 
-document.getElementById("ai").innerText=text
+const { jsPDF } = window.jspdf
+let doc = new jsPDF()
+
+doc.text("Schmerztagebuch Bericht",10,10)
+
+data.forEach((e,i)=>{
+doc.text(`${e.date} Schmerz:${e.pain}`,10,20+(i*10))
+})
+
+doc.save("bericht.pdf")
 
 }
 
