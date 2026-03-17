@@ -3,62 +3,181 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Schmerztagebuch</title>
+
+<title>Schmerztagebuch App</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body{font-family:Arial;padding:20px;background:#f4f6f8;max-width:700px;margin:auto;}
-input, textarea, select{width:100%;margin-bottom:10px;padding:8px;}
-button{padding:10px;background:#4CAF50;color:white;border:none;border-radius:5px;width:100%;}
-.entry{background:white;padding:10px;margin-top:10px;border-radius:5px;}
+
+body{
+font-family:-apple-system;
+margin:0;
+background:#f2f2f7;
+}
+
+.screen{
+display:none;
+padding:15px;
+}
+
+.active{
+display:block;
+}
+
+.card{
+background:white;
+padding:15px;
+border-radius:12px;
+margin-bottom:15px;
+}
+
+button{
+background:#007AFF;
+color:white;
+border:none;
+padding:12px;
+border-radius:10px;
+width:100%;
+margin-top:10px;
+}
+
+input, textarea{
+width:100%;
+padding:10px;
+margin-top:8px;
+border-radius:8px;
+border:1px solid #ddd;
+}
+
+.nav{
+position:fixed;
+bottom:0;
+width:100%;
+display:flex;
+background:white;
+border-top:1px solid #ccc;
+}
+
+.nav button{
+flex:1;
+background:none;
+color:#007AFF;
+padding:10px;
+}
+
+.selected{
+background:#007AFF;
+color:white;
+}
+
+.bodymap button{
+margin:5px;
+background:#eee;
+color:black;
+}
+
 </style>
 </head>
 
 <body>
 
-<h1>Schmerztagebuch</h1>
+<!-- SCREEN 1: EINTRAG -->
+<div id="entry" class="screen active">
 
-<input type="number" id="pain" placeholder="Schmerzlevel 0-10">
+<h2>Neuer Eintrag</h2>
+
+<div class="card">
+
+<input type="number" id="pain" placeholder="Schmerz 0-10">
 <input type="range" id="stress" min="0" max="10">
 <input type="text" id="med" placeholder="Medikament">
 
-<select id="loc">
-<option value="">Körperstelle</option>
-<option>Kopf</option>
-<option>Rücken</option>
-<option>Bauch</option>
-<option>Bein</option>
-</select>
+<div class="bodymap">
+<button onclick="selectLoc(this,'Kopf')">Kopf</button>
+<button onclick="selectLoc(this,'Rücken')">Rücken</button>
+<button onclick="selectLoc(this,'Bauch')">Bauch</button>
+<button onclick="selectLoc(this,'Bein')">Bein</button>
+</div>
 
 <textarea id="notes" placeholder="Notizen"></textarea>
 
 <button onclick="save()">Speichern</button>
 
+</div>
+
+</div>
+
+<!-- SCREEN 2: VERLAUF -->
+<div id="history" class="screen">
+
+<h2>Verlauf</h2>
+
+<div class="card">
 <canvas id="chart"></canvas>
+</div>
 
 <div id="list"></div>
-<div id="ai"></div>
+
+</div>
+
+<!-- SCREEN 3: ANALYSE -->
+<div id="analysis" class="screen">
+
+<h2>Analyse</h2>
+
+<div class="card" id="ai"></div>
+
+</div>
+
+<!-- NAVIGATION -->
+<div class="nav">
+<button onclick="show('entry')">➕</button>
+<button onclick="show('history')">📊</button>
+<button onclick="show('analysis')">🤖</button>
+</div>
 
 <script>
 
 let data = JSON.parse(localStorage.getItem("painData")) || []
+let selectedLoc=""
+
+function show(id){
+document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"))
+document.getElementById(id).classList.add("active")
+
+if(id==="history") render()
+if(id==="analysis") runAI()
+}
+
+function selectLoc(btn,loc){
+selectedLoc=loc
+document.querySelectorAll(".bodymap button")
+.forEach(b=>b.classList.remove("selected"))
+btn.classList.add("selected")
+}
 
 function save(){
 
 let entry={
-date:new Date().toLocaleDateString(),
-pain: Number(document.getElementById("pain").value),
-stress: Number(document.getElementById("stress").value),
-med: document.getElementById("med").value,
-loc: document.getElementById("loc").value,
-notes: document.getElementById("notes").value
+date:new Date().toLocaleString(),
+pain:Number(document.getElementById("pain").value),
+stress:Number(document.getElementById("stress").value),
+med:document.getElementById("med").value,
+loc:selectedLoc,
+notes:document.getElementById("notes").value
+}
+
+if(!entry.pain||!entry.loc){
+alert("Bitte Schmerz und Ort wählen")
+return
 }
 
 data.push(entry)
 localStorage.setItem("painData",JSON.stringify(data))
 
-render()
+alert("Gespeichert ✅")
+
 }
 
 function render(){
@@ -67,15 +186,14 @@ document.getElementById("list").innerHTML=""
 
 data.forEach(e=>{
 document.getElementById("list").innerHTML+=`
-<div class="entry">
+<div class="card">
 ${e.date}<br>
 Schmerz:${e.pain} Stress:${e.stress}<br>
-Med:${e.med} Ort:${e.loc}
+Ort:${e.loc}
 </div>`
 })
 
 drawChart()
-runAI()
 
 }
 
@@ -88,7 +206,13 @@ if(window.c) window.c.destroy()
 
 window.c=new Chart(document.getElementById("chart"),{
 type:"line",
-data:{labels:labels,datasets:[{label:"Schmerz",data:values}]}
+data:{
+labels:labels,
+datasets:[{
+label:"Schmerzverlauf",
+data:values
+}]
+}
 })
 
 }
@@ -100,14 +224,27 @@ document.getElementById("ai").innerText="Zu wenig Daten"
 return
 }
 
-let avg=data.reduce((a,b)=>a+(b.pain*b.stress),0)/data.length
+let stressImpact = data.reduce((a,b)=>a+(b.pain*b.stress),0)/data.length
 
-document.getElementById("ai").innerText=
-avg>40?"Stress beeinflusst Schmerz":"Kein klarer Zusammenhang"
+let locations={}
+data.forEach(e=>{
+locations[e.loc]=(locations[e.loc]||0)+e.pain
+})
 
+let worstLoc = Object.keys(locations)
+.sort((a,b)=>locations[b]-locations[a])[0]
+
+let text=""
+
+if(stressImpact>40){
+text+="⚠️ Stress verstärkt Schmerzen\n"
 }
 
-render()
+text+="Häufigste Stelle: "+worstLoc
+
+document.getElementById("ai").innerText=text
+
+}
 
 </script>
 
