@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Schmerztagebuch</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body{font-family:Arial;padding:20px;background:#f4f6f8;max-width:700px;margin:auto;}
+input, textarea, select{width:100%;margin-bottom:10px;padding:8px;}
+button{padding:10px;background:#4CAF50;color:white;border:none;border-radius:5px;width:100%;}
+.entry{background:white;padding:10px;margin-top:10px;border-radius:5px;}
+</style>
+</head>
+
+<body>
+
+<h1>Schmerztagebuch</h1>
+
+<input type="number" id="pain" placeholder="Schmerzlevel 0-10">
+<input type="range" id="stress" min="0" max="10">
+<input type="text" id="med" placeholder="Medikament">
+
+<select id="loc">
+<option value="">Körperstelle</option>
+<option>Kopf</option>
+<option>Rücken</option>
+<option>Bauch</option>
+<option>Bein</option>
+</select>
+
+<textarea id="notes" placeholder="Notizen"></textarea>
+
+<button onclick="save()">Speichern</button>
+
+<canvas id="chart"></canvas>
+
+<div id="list"></div>
+<div id="ai"></div>
+
+<script>
+
+let data = JSON.parse(localStorage.getItem("painData")) || []
+
+function save(){
+
+let entry={
+date:new Date().toLocaleDateString(),
+pain: Number(document.getElementById("pain").value),
+stress: Number(document.getElementById("stress").value),
+med: document.getElementById("med").value,
+loc: document.getElementById("loc").value,
+notes: document.getElementById("notes").value
+}
+
+data.push(entry)
+localStorage.setItem("painData",JSON.stringify(data))
+
+render()
+}
+
+function render(){
+
+document.getElementById("list").innerHTML=""
+
+data.forEach(e=>{
+document.getElementById("list").innerHTML+=`
+<div class="entry">
+${e.date}<br>
+Schmerz:${e.pain} Stress:${e.stress}<br>
+Med:${e.med} Ort:${e.loc}
+</div>`
+})
+
+drawChart()
+runAI()
+
+}
+
+function drawChart(){
+
+let labels=data.map(e=>e.date)
+let values=data.map(e=>e.pain)
+
+if(window.c) window.c.destroy()
+
+window.c=new Chart(document.getElementById("chart"),{
+type:"line",
+data:{labels:labels,datasets:[{label:"Schmerz",data:values}]}
+})
+
+}
+
+function runAI(){
+
+if(data.length<3){
+document.getElementById("ai").innerText="Zu wenig Daten"
+return
+}
+
+let avg=data.reduce((a,b)=>a+(b.pain*b.stress),0)/data.length
+
+document.getElementById("ai").innerText=
+avg>40?"Stress beeinflusst Schmerz":"Kein klarer Zusammenhang"
+
+}
+
+render()
+
+</script>
+
+</body>
+</html>
