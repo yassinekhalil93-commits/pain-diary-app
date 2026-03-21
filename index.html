@@ -4,54 +4,60 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Schmerztagebuch Pro+</title>
+<title>PainTracker Pro</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
 
-body{font-family:-apple-system;margin:0;background:#f2f2f7;}
-.screen{display:none;padding:15px;padding-bottom:80px;}
-.active{display:block;}
+body{
+font-family:-apple-system;
+background:#f2f2f7;
+margin:0;
+padding:15px;
+}
+
+h1{text-align:center;}
 
 .card{
 background:white;
 padding:15px;
 border-radius:16px;
 margin-bottom:15px;
+box-shadow:0 4px 12px rgba(0,0,0,0.05);
 }
 
 button{
+border:none;
+border-radius:10px;
+padding:10px;
+margin:5px;
+font-size:14px;
+}
+
+.primary{
 background:#007AFF;
 color:white;
-border:none;
-padding:12px;
-border-radius:10px;
 width:100%;
-margin-top:10px;
 }
 
 input, textarea{
 width:100%;
 padding:10px;
-margin-top:8px;
+margin-top:10px;
 border-radius:8px;
 border:1px solid #ddd;
 }
 
-.nav{
-position:fixed;
-bottom:0;
-width:100%;
-display:flex;
-background:white;
+svg{
+margin-top:10px;
 }
 
-.nav button{
-flex:1;
-background:none;
-color:#007AFF;
+.pain-item{
+background:#f9f9f9;
+padding:10px;
+border-radius:10px;
+margin-top:10px;
 }
 
 </style>
@@ -59,168 +65,201 @@ color:#007AFF;
 
 <body>
 
-<!-- LOGIN -->
-<div id="login" class="screen active">
-<h2>Login</h2>
+<h1>PainTracker</h1>
 
 <div class="card">
-<input id="user" placeholder="Name">
-<button onclick="login()">Start</button>
-</div>
-</div>
 
-<!-- APP -->
-<div id="app" class="screen">
+<h3>Körper auswählen</h3>
 
-<!-- ENTRY -->
-<div id="entry">
-<div class="card">
+<svg viewBox="0 0 200 400" style="width:100%; max-width:250px; display:block; margin:auto;">
 
-<input id="pain" type="number" placeholder="Schmerz 0-10">
+<circle cx="100" cy="40" r="25" fill="#ccc"
+onclick="addPain(evt,'Kopf')" />
+
+<rect x="70" y="70" width="60" height="100" fill="#ccc"
+onclick="addPain(evt,'Rücken')" />
+
+<rect x="70" y="170" width="60" height="60" fill="#ccc"
+onclick="addPain(evt,'Bauch')" />
+
+<rect x="70" y="230" width="25" height="100" fill="#ccc"
+onclick="addPain(evt,'Bein links')" />
+
+<rect x="105" y="230" width="25" height="100" fill="#ccc"
+onclick="addPain(evt,'Bein rechts')" />
+
+</svg>
+
+<div id="painList"></div>
+
+<label>Stress</label>
 <input id="stress" type="range" min="0" max="10">
-<input id="med" placeholder="Medikament">
 
-<select id="loc">
-<option value="">Ort wählen</option>
-<option>Kopf</option>
-<option>Rücken</option>
-<option>Bauch</option>
-<option>Bein</option>
-</select>
+<label>Medikament</label>
+<input id="med">
 
+<label>Notizen</label>
 <textarea id="notes"></textarea>
 
-<button onclick="save()">Speichern</button>
+<button class="primary" onclick="save()">Speichern</button>
 
 </div>
-</div>
 
-<!-- HISTORY -->
-<div id="history" style="display:none">
+<div class="card">
 <canvas id="chart"></canvas>
-<div id="list"></div>
 </div>
 
-<!-- ANALYSIS -->
-<div id="analysis" style="display:none">
-<div id="ai"></div>
-<button onclick="exportPDF()">PDF Export</button>
-</div>
-
-</div>
-
-<!-- NAV -->
-<div class="nav">
-<button onclick="showTab('entry')">➕</button>
-<button onclick="showTab('history')">📊</button>
-<button onclick="showTab('analysis')">🤖</button>
-</div>
+<div class="card" id="analysis"></div>
 
 <script>
 
-let user = localStorage.getItem("user")
 let data = JSON.parse(localStorage.getItem("data")) || []
+let pains = []
 
-if(user){
-document.getElementById("login").classList.remove("active")
-document.getElementById("app").classList.add("active")
+function addPain(evt, loc){
+
+if(pains.find(p=>p.loc===loc)) return
+
+pains.push({loc:loc, level:5})
+
+// Farbe setzen
+evt.target.setAttribute("fill","#007AFF")
+
+renderPains()
+
 }
 
-function login(){
-user = document.getElementById("user").value
-localStorage.setItem("user",user)
-location.reload()
+function renderPains(){
+
+let container=document.getElementById("painList")
+container.innerHTML=""
+
+pains.forEach((p,i)=>{
+
+container.innerHTML+=`
+<div class="pain-item">
+<strong>${p.loc}</strong>
+
+<input type="range" min="0" max="10"
+value="${p.level}"
+oninput="updatePain(${i},this.value)">
+
+<button onclick="removePain(${i})">Entfernen</button>
+</div>
+`
+
+})
+
 }
 
-function showTab(tab){
-document.getElementById("entry").style.display="none"
-document.getElementById("history").style.display="none"
-document.getElementById("analysis").style.display="none"
+function updatePain(i,val){
+pains[i].level = Number(val)
+}
 
-document.getElementById(tab).style.display="block"
+function removePain(i){
+pains.splice(i,1)
+renderPains()
+resetBodymap()
+}
 
-if(tab==="history") render()
-if(tab==="analysis") runAI()
+function resetBodymap(){
+document.querySelectorAll("svg *").forEach(el=>{
+el.setAttribute("fill","#ccc")
+})
+
+pains.forEach(p=>{
+highlight(p.loc)
+})
+}
+
+function highlight(loc){
+
+let map = {
+"Kopf":0,
+"Rücken":1,
+"Bauch":2,
+"Bein links":3,
+"Bein rechts":4
+}
+
+let el = document.querySelectorAll("svg *")[map[loc]]
+if(el) el.setAttribute("fill","#007AFF")
+
 }
 
 function save(){
 
-let pain = document.getElementById("pain").value
+if(pains.length===0){
+alert("Bitte Schmerz auswählen")
+return
+}
 
 let entry={
 date:new Date().toISOString(),
-pain: pain===""?null:Number(pain),
+pains:pains,
 stress:Number(document.getElementById("stress").value),
 med:document.getElementById("med").value,
-loc:document.getElementById("loc").value,
 notes:document.getElementById("notes").value
-}
-
-if(entry.pain===null||entry.loc===""){
-alert("Bitte alles ausfüllen")
-return
 }
 
 data.push(entry)
 localStorage.setItem("data",JSON.stringify(data))
 
-alert("Gespeichert")
+pains=[]
+renderPains()
+resetBodymap()
+
+drawChart()
+runAnalysis()
+
+alert("Gespeichert ✅")
 
 }
 
-function render(){
+function drawChart(){
 
-let list=document.getElementById("list")
-list.innerHTML=""
-
-data.forEach(e=>{
-list.innerHTML+=`
-<div class="card">
-${new Date(e.date).toLocaleDateString()}<br>
-Schmerz:${e.pain}
-</div>`
-})
-
-let labels=data.map(e=>e.date)
-let values=data.map(e=>e.pain)
+let values=data.map(e=>
+e.pains.reduce((a,b)=>a+Number(b.level),0)
+)
 
 if(window.c) window.c.destroy()
 
 window.c=new Chart(document.getElementById("chart"),{
 type:"line",
-data:{labels:labels,datasets:[{data:values}]}
+data:{
+labels:data.map(e=>new Date(e.date).toLocaleDateString()),
+datasets:[{data:values}]
+}
 })
 
 }
 
-function runAI(){
+function runAnalysis(){
 
-if(data.length<3){
-document.getElementById("ai").innerText="Zu wenig Daten"
-return
-}
+let total=0
+let count=0
+let locs={}
 
-let avg=data.reduce((a,b)=>a+b.pain,0)/data.length
-
-document.getElementById("ai").innerText=
-"Durchschnitt Schmerz: "+avg.toFixed(1)
-
-}
-
-async function exportPDF(){
-
-const { jsPDF } = window.jspdf
-let doc = new jsPDF()
-
-doc.text("Schmerztagebuch Bericht",10,10)
-
-data.forEach((e,i)=>{
-doc.text(`${e.date} Schmerz:${e.pain}`,10,20+(i*10))
+data.forEach(e=>{
+e.pains.forEach(p=>{
+total+=Number(p.level)
+count++
+locs[p.loc]=(locs[p.loc]||0)+Number(p.level)
+})
 })
 
-doc.save("bericht.pdf")
+let avg = count ? total/count : 0
+
+let worst = Object.keys(locs)
+.sort((a,b)=>locs[b]-locs[a])[0]
+
+document.getElementById("analysis").innerText =
+"Ø Schmerz: "+avg.toFixed(1)+"\nHäufigste Stelle: "+(worst||"-")
 
 }
+
+drawChart()
+runAnalysis()
 
 </script>
 
